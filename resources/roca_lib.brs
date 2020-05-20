@@ -8,7 +8,10 @@ function roca(args = {} as object)
     return {
         log: __util_log,
         args: args,
+        __createDescribeBlock: __roca_createDescribeBlock,
         describe: __roca_describe,
+        fdescribe: __roca_fdescribe,
+        xdescribe: __roca_xdescribe,
         it: __it,
         fit: __fit,
         xit: __xit
@@ -20,7 +23,25 @@ end function
 ' @param {function} func - the function to execute as part of this suite.
 ' @returns {assocarray} - the newly-created test suite -- state included.
 function __roca_describe(description as string, func as object)
+    return m.__createDescribeBlock("default", description, func)
+end function
+
+function __roca_fdescribe(description as string, func as object)
+    return m.__createDescribeBlock("focus", description, func)
+end function
+
+function __roca_xdescribe(description as string, func as object)
+    return m.__createDescribeBlock("skip", description, func)
+end function
+
+function __roca_createDescribeBlock(mode as string, description as string, func as object)
+    if mode <> "default" and mode <> "skip" and mode <> "focus" then
+        print "[roca.brs] Error: Received unexpected describe block mode'" mode "'"
+        return
+    end if
+
     suite = __roca_suite()
+    suite.__state.mode = mode
     suite.__state.description = description
     suite.__state.func = func
 
@@ -33,11 +54,14 @@ function __roca_describe(description as string, func as object)
     withM = {
         __suite: suite
         __func: suite.__state.func
+        __createDescribeBlock: __roca_createDescribeBlock
         log: __util_log
         it: __it
         fit: __fit
         xit: __xit
         describe: __roca_describe
+        fdescribe: __roca_fdescribe
+        xdescribe: __roca_xdescribe
     }
     withM.__func()
 
@@ -72,6 +96,7 @@ end sub
 function __roca_suite()
     return {
         __state: {
+            mode: ""
             parentSuite: invalid,
             description: "",
             cases: [],
@@ -88,6 +113,7 @@ function __roca_suite()
         __totalCases: __suite_totalCases,
         __registerSuite: __suite_registerSuite,
         __registerCase: __suite_registerCase,
+        __filterFocused: __suite_filterFocused,
         exec: __suite_exec,
     }
 end function
@@ -153,14 +179,15 @@ function __suite_transitivelyHasFocusedCases() as boolean
     for each suite in m.__state.suites
         if suite.__state.hasFocusedCases = true then
             return true
+        else if suite.__state.mode = "focus" then
+            return true
         else if suite.__transitivelyHasFocusedCases() = true then
             return true
         end if
     end for
 
-    return m.__state.hasFocusedCases
+    return m.__state.mode = "focus" or m.__state.hasFocusedCases
 end function
-
 
 function __suite_totalCases() as integer
     cases = 0
@@ -178,8 +205,44 @@ sub __suite_registerSuite(suite)
     m.__state.suites.push(suite)
 end sub
 
+sub __suite_filterFocused()
+    ' If the suite is focused, then we want to test everything in the suite.
+    if m.__state.mode = "focus" then
+        for each suite in m.__state.suites
+            ' Mark each suite as focused so that we don't exclude it.
+            suite.__state.mode = "focus"
+        end for
+        return
+    end if
+
+    ' If only certain tests/sub-suites are focused, filter out any that are not focused.
+    focusedCases = []
+    for each testCase in m.__state.cases
+        if testCase.mode = "focus"
+            focusedCases.push(testCase)
+        end if
+    end for
+    m.__state.cases = focusedCases
+
+    focusedSuites = []
+    for each suite in m.__state.suites
+        if suite.__state.transitivelyHasFocusedCases then
+            focusedSuites.push(suite)
+        end if
+    end for
+    m.__state.suites = focusedSuites
+end sub
+
 sub __suite_exec(args as object)
     if args.exec <> true then return
+
+    if args.focusedCasesDetected then
+        ' If this suite is not focused, and doesn't have any focused descendants, then skip it.
+        if m.__state.mode <> "focus" and m.__state.transitivelyHasFocusedCases <> true then return
+
+        ' Filter out any non-focused descendant tests and suites.
+        m.__filterFocused()
+    end if
 
     tap = args.tap
     tap.enterSubTest(m.__state.description)
@@ -201,10 +264,8 @@ sub __suite_exec(args as object)
     index = subTestIndex
     for each case in m.__state.cases
         tap.indent()
-        if (args.focusedCasesDetected and case.mode = "focus") or not args.focusedCasesDetected then
-            if case.mode <> "skip" then
-                case.exec()
-            end if
+        if case.mode <> "skip" then
+            case.exec()
         end if
         result = case.report(index, tap)
         if result = "passed" then

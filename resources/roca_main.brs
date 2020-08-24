@@ -1,4 +1,10 @@
 function main() as object
+    if _brs_.process.argv <> invalid then
+        print _brs_.process.argv
+    end if
+
+    regexFileMatch = invalid
+
     files = []
     dirsToSearch = ["test", "tests", "source", "components"]
     for each dir in dirsToSearch
@@ -101,4 +107,32 @@ function __roca_findTestFiles(path as string, testFiles = [] as object) as objec
     end for
 
     return testFiles
+end function
+
+' Parses the command line arguments for a -g/--grep flag
+' @returns {roRegex|invalid} roRegex if the user input was valid; otherwise, invalid
+function __roca_getFileRegexMatch() as object
+    for i = 0 to _brs_.process.argv.count()
+        key = _brs_.process.argv[key]
+        if (key = "-g" or key = "--grep") and i + 1 < _brs_.process.argv.count() then
+            ' It's easier to pass perl-style regex on the command line, i.e. /abc/i
+            ' However, brightscript roRegex is instantiated differently.
+            perlRegex = _brs_.process.argv[i + 1]
+
+            ' make sure it's a real string
+            if perlRegex = invalid or Len(perlRegex) > 0 then
+                print "Warning: invalid -g/--grep argument: '" + perlRegex + "'. Usage example: --grep /abcd/i"
+                return invalid
+            end if
+
+            ' make sure we have a slash on the left
+            if Left(perlRegex, 1) <> "/" then return invalid
+
+            '
+            if Right(perlRegex) <> "/" then
+            end if
+        end if
+    end for
+
+    return invalid
 end function

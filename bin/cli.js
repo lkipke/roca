@@ -42,7 +42,8 @@ const argv = require('yargs')
                 sourceDir: argv.s,
                 reporter: argv.reporter,
                 requireFilePath: argv.r,
-                forbidFocused: argv.f
+                forbidFocused: argv.f,
+                grep: argv.g
             });
         }
     )
@@ -52,7 +53,8 @@ const argv = require('yargs')
     .alias("r", "require")
     .describe("f", "Fail if focused test or suite is encountered")
     .alias("f", "forbid-focused")
+    .describe("g", "Test filter given regular expression.")
+    .alias("g", "grep")
     .help("h")
     .alias("h", "help")
     .argv;
-

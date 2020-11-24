@@ -1,0 +1,24 @@
+TAP version 13
+
+ok 1 - everything is ok, just very communicative
+  ---
+  yaml: is
+  so: true
+  to:
+    - every
+    - vector
+
+not ok 2 - failing, gonna tell you why
+  ---
+  at:
+    file: foo.js
+    line: 13
+    column: 4
+  message: This is not ok
+  thrown: true
+
+# Subtest: child test
+    ok 1
+    1..1
+
+1..3

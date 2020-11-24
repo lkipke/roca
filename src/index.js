@@ -5,6 +5,7 @@ const util = require("util");
 const TapMochaReporter = require("tap-mocha-reporter");
 const c = require("ansi-colors");
 const coverage = require("./coverage");
+const Reporter = require("./reporter");
 
 async function findBrsFiles(sourceDir) {
     let searchDir = sourceDir || "source";
@@ -23,7 +24,14 @@ async function runTest(files, options) {
         "assert_lib.brs"
     ].map(basename => path.join(__dirname, "..", "resources", basename));
 
-    let reporterStream = new TapMochaReporter(reporter);
+    let reporterStream;
+    if (reporter === "custom") {
+        reporterStream = Reporter.createReporterStream()
+        // reporterStream = new Stream.Transform().pipe(tapDiff()).pipe(process.stdout);
+    } else {
+        reporterStream = new TapMochaReporter(reporter);
+    }
+
     let allTestFiles = [...rocaFiles];
     if (requireFilePath) {
         allTestFiles.push(requireFilePath);
@@ -38,6 +46,8 @@ async function runTest(files, options) {
             generateCoverage: coverageEnabled,
             componentDirs: ["test", "tests"]
         });
+
+        reporterStream.pipe(process.stdout);
 
         reporterStream.end();
 
@@ -66,7 +76,7 @@ async function runTest(files, options) {
         process.exitCode = 1;
     }
 
-    return reporterStream.runner.testResults;
+    return// reporterStream.runner.testResults;
 }
 
 module.exports = async function(args) {

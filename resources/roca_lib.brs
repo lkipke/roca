@@ -167,13 +167,13 @@ end sub
 sub __roca_addContext(ctx as object)
     if type(ctx) <> "roAssociativeArray" then
         print "[roca.brs] Error: addContext only accepts a 'roAssociativeArray' - got '" type(ctx) "'"
-    ' called from roca object
+        ' called from roca object
     else if m.__ctx <> invalid then
         m.__ctx.append(ctx)
 
         ' make context immediately accessible in roca object
         m.append(ctx)
-    ' called in suite
+        ' called in suite
     else
         m.__suite.__ctx.append(ctx)
 
@@ -275,7 +275,7 @@ function __case_execute()
         end if
     end for
 
-    if m.func_args <> invalid then 
+    if m.func_args <> invalid then
         withM.__func(m.func_args)
     else
         withM.__func()

@@ -35,6 +35,7 @@
     "istanbul-lib-report": "^3.0.0",
     "istanbul-reports": "^3.0.2",
     "jest-console": "^0.1.0",
+    "jest-haste-map": "^26.6.2",
     "jest-matcher-utils": "^26.6.2",
     "jest-message-util": "^26.6.2",
     "tap-diff": "^0.1.1",

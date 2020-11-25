@@ -51,6 +51,7 @@ function main() as object
     for each filePath in files
         ' user-facing
         filePathWithoutPkg = filePath.replace("pkg:", "")
+        args.tap.setFilePath(filePathWithoutPkg)
 
         ' Don't allow test files to pollute each other
         _brs_.resetMocks()
@@ -59,7 +60,7 @@ function main() as object
 
         ' If brs returned invalid for runInScope, that means the suite threw an exception, so we should bail.
         if suite = invalid then
-            tap.bail("Error running tests: Runtime exception occurred in " + filePath.replace("pkg:", ""))
+            tap.bail("Error running tests: Runtime exception occurred in " + filePathWithoutPkg))
             return {}
         end if
 

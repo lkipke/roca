@@ -15,10 +15,10 @@ const argv = require('yargs')
                 alias: "R",
                 type: "string",
                 describe: "The mocha reporter to use, via tap-mocha-reporter",
-                default: "custom",
+                default: "default",
                 choices: [
                     "classic",
-                    "custom",
+                    "default",
                     "doc",
                     "dot",
                     "dump",

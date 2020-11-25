@@ -17,7 +17,11 @@ sub __equal(actual, expected, error)
     if actual = expected then
         m.__pass()
     else
-        m.__fail(m.formatError(error))
+        m.__fail(m.formatError({
+            message: error,
+            actual: actual,
+            expected: expected
+        }))
     end if
 end sub
 
@@ -25,7 +29,11 @@ sub __notEqual(actual, expected, error)
     if actual <> expected then
         m.__pass()
     else
-        m.__fail(m.formatError(error))
+        m.__fail(m.formatError({
+            message: error,
+            actual: actual,
+            expected: expected
+        }))
     end if
 end sub
 
@@ -33,7 +41,11 @@ sub __isTrue(actual, error)
     if actual = true then
         m.__pass()
     else
-        m.__fail(m.formatError(error))
+        m.__fail(m.formatError({
+            message: error,
+            actual: actual,
+            expected: true
+        }))
     end if
 end sub
 
@@ -41,7 +53,11 @@ sub __isFalse(actual, error)
     if actual = false then
         m.__pass()
     else
-        m.__fail(m.formatError(error))
+        m.__fail(m.formatError({
+            message: error,
+            actual: actual,
+            expected: false
+        }))
     end if
 end sub
 
@@ -49,17 +65,17 @@ sub __isInvalid(actual, error)
     if actual = invalid then
         m.__pass()
     else
-        m.__fail(m.formatError(error))
+        m.__fail(m.formatError({
+            message: error,
+            actual: actual,
+            expected: invalid
+        }))
     end if
 end sub
 
-function __formatError(errMessage)
-    return {
-        error: {
-            message: errMessage
-        },
-        stack: {}
-    }
+function __formatError(error)
+    error.stack = _brs_.getStackTrace()
+    return error
 end function
 
 sub __deepEquals(actual, expected, error)

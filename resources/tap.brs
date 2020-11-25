@@ -92,6 +92,13 @@ sub __tap_printExtras(extra = {}, level = 0)
             level = level + 1
             m.printExtras(extra[item], level)
             level = level - 1
+        else if type(extra[item]) = "roArray" then
+            print m.getIndent() item ":"
+            m.indent()
+            for each item in extra[item]
+                print m.getIndent() "- " item
+            end for
+            m.deindent()
         else if extra[item] <> invalid
             print m.getIndent() item ": " extra[item]
         end if

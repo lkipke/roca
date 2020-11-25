@@ -6,6 +6,7 @@ const TapMochaReporter = require("tap-mocha-reporter");
 const c = require("ansi-colors");
 const coverage = require("./coverage");
 const Reporter = require("./reporter");
+const { Stream } = require("stream");
 
 async function findBrsFiles(sourceDir) {
     let searchDir = sourceDir || "source";
@@ -25,9 +26,10 @@ async function runTest(files, options) {
     ].map(basename => path.join(__dirname, "..", "resources", basename));
 
     let reporterStream;
-    if (reporter === "custom") {
+    if (reporter === "default") {
         reporterStream = Reporter.createReporterStream()
-        // reporterStream = new Stream.Transform().pipe(tapDiff()).pipe(process.stdout);
+    } else if (reporter === "tap") {
+        reporterStream = new Stream.Transform().pipe(process.stdout);
     } else {
         reporterStream = new TapMochaReporter(reporter);
     }
@@ -46,8 +48,6 @@ async function runTest(files, options) {
             generateCoverage: coverageEnabled,
             componentDirs: ["test", "tests"]
         });
-
-        reporterStream.pipe(process.stdout);
 
         reporterStream.end();
 

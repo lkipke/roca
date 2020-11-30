@@ -26,11 +26,28 @@ function createReporterStream() {
   return parser;
 }
 
+async function createReporter() {
+  let { projectConfig, globalConfig } = await JestConfig.readConfig(
+    {},
+    process.cwd()
+  );
+  return new Reporter(projectConfig, globalConfig);
+}
+
 class Reporter extends Parser {
-  constructor() {
+  constructor(projectConfig, globalConfig) {
     super();
-    this.reporter = new JestReporter.DefaultReporter();
     this.subscribe();
+
+    this.jestConfigs = {
+      project: projectConfig,
+      global: globalConfig,
+    };
+    this.reporter = new JestReporter.DefaultReporter(globalConfig);
+
+    this.testResults = [];
+    this.currentRun = {};
+    this.initializeAggregatedResults();
   }
 
   subscribe() {
@@ -43,10 +60,16 @@ class Reporter extends Parser {
     parser.on('assert', function (failure) {});
     parser.on('comment', function (comment) {
       let commentParts = comment.slice(2).split(' ');
-      console.log(commentParts);
       if (commentParts[0] === 'RUN_START') {
-        console.log('file path');
-        console.log(commentParts[1]);
+        this.currentRun = {
+          path: commentParts[1],
+          context: {
+            path: commentParts[1],
+            config: this.jestConfigs.project,
+          },
+        };
+
+        this.reporter.onRunStart();
       }
     });
     parser.on('plan', function (plan) {});
@@ -63,12 +86,49 @@ class Reporter extends Parser {
     });
     parser.on('fail', function (assert) {
       output('Fail', assert.diag.stack);
+      this.reporter.onTestResult(this.currentRun);
     });
     parser.on('skip', function (assert) {});
     parser.on('todo', function (assert) {});
     parser.on('extra', function (extra) {
       output('Extra', extra);
     });
+  }
+
+  initializeAggregatedResults() {
+    this.aggregatedResults = {
+      numFailedTests: 0,
+      numFailedTestSuites: 0,
+      numPassedTests: 0,
+      numPassedTestSuites: 0,
+      numPendingTests: 0,
+      numTodoTests: 0,
+      numPendingTestSuites: 0,
+      numRuntimeErrorTestSuites: 0,
+      numTotalTests: 0,
+      numTotalTestSuites: 0,
+      openHandles: [],
+      startTime: 0,
+      success: true,
+      testResults: [],
+      wasInterrupted: false,
+      snapshot: {
+        added: 0,
+        didUpdate: false,
+        failure: false,
+        filesAdded: 0,
+        filesRemoved: 0,
+        filesRemovedList: [],
+        filesUnmatched: 0,
+        filesUpdated: 0,
+        matched: 0,
+        total: 0,
+        unchecked: 0,
+        uncheckedKeysByFile: [],
+        unmatched: 0,
+        updated: 0,
+      },
+    };
   }
 }
 

@@ -20,7 +20,8 @@ sub __equal(actual, expected, error)
         m.__fail(m.formatError({
             message: error,
             actual: actual,
-            expected: expected
+            expected: expected,
+            funcName: "m.assert.equal"
         }))
     end if
 end sub
@@ -32,7 +33,8 @@ sub __notEqual(actual, expected, error)
         m.__fail(m.formatError({
             message: error,
             actual: actual,
-            expected: expected
+            expected: expected,
+            funcName: "m.assert.notEqual"
         }))
     end if
 end sub
@@ -44,7 +46,8 @@ sub __isTrue(actual, error)
         m.__fail(m.formatError({
             message: error,
             actual: actual,
-            expected: true
+            expected: true,
+            funcName: "m.assert.isTrue"
         }))
     end if
 end sub
@@ -56,7 +59,8 @@ sub __isFalse(actual, error)
         m.__fail(m.formatError({
             message: error,
             actual: actual,
-            expected: false
+            expected: false,
+            funcName: "m.assert.isFalse"
         }))
     end if
 end sub
@@ -68,13 +72,14 @@ sub __isInvalid(actual, error)
         m.__fail(m.formatError({
             message: error,
             actual: actual,
-            expected: invalid
+            expected: invalid,
+            funcName: "m.assert.isInvalid"
         }))
     end if
 end sub
 
 function __formatError(error)
-    error.stack = _brs_.getStackTrace()
+    error.stack = _brs_.getStackTrace(2, "@hulu/roca")
     return error
 end function
 

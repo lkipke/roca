@@ -237,7 +237,10 @@ sub __suite_registerCase(mode as string, description as string, suite as object,
         mode: mode,
         __state: {
             success: invalid
-            metadata: invalid
+            metadata: {
+                passingAsserts: 0,
+                failingAsserts: 0
+            }
         },
         description: description,
         func: func,
@@ -437,6 +440,7 @@ end sub
 ' If the test case is already in a failure state, do nothing
 ' to preserve the previous failure.
 sub __util_pass()
+    m.__state.passingAsserts += 1
     if m.__state.success <> false
         m.__state.success = true
     end if

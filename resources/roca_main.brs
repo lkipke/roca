@@ -45,18 +45,20 @@ function main() as object
         exec: true,
         focusedCasesDetected: focusedCasesDetected
         index: 0,
-        tap: tap
+        tap: tap,
+        isRootSuite: true
     }
 
     for each filePath in files
         ' user-facing
         filePathWithoutPkg = filePath.replace("pkg:", "")
-        args.tap.setFilePath(filePathWithoutPkg)
 
         ' Don't allow test files to pollute each other
         _brs_.resetMocks()
 
+        tap.diagnostic("FILE_START: " filePathWithoutPkg)
         suite = _brs_.runInScope(filePath, args)
+        tap.diagnostic("FILE_END: " filePathWithoutPkg)
 
         ' If brs returned invalid for runInScope, that means the suite threw an exception, so we should bail.
         if suite = invalid then

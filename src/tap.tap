@@ -1,7 +1,6 @@
 TAP version 13
 
-# RUN_START /Users/levikipke/Projects/cheese-please/__tests__/App-test.js:22:10
-# TEST_START 
+# FILE_START /Users/levi.kipke/Projects/cube-roku/tests/components/login/SomeOtherPage.test.brs
 ok 1 - everything is ok, just very communicative
   ---
   yaml: is
@@ -12,19 +11,44 @@ ok 1 - everything is ok, just very communicative
   ...
 
 not ok 2 - failing, gonna tell you why
-  ---
-  at:
-    file: foo.js
-    line: 13
-    column: 4
-  message: This is not ok
-  thrown: true
-  ...
+    ---
+    error:
+        message: foo can't be the same as fop
+        expected: "foo"
+        actual: "fop"
+        funcName: m.assertEqual
+    stack:
+        - /Users/levi.kipke/Projects/cube-roku/tests/components/login/LoginPage.test.brs:9:22
+        - /Users/levi.kipke/Projects/cube-roku/tests/components/login/LoginPage.test.brs:5:22
+    numPassingAsserts: 3
+    ...
 
 # Subtest: child test
     ok 1
     1..1
 
-1..3
+ok 1 - child test
 
-# RUN_COMPLETE
+# FILE_END /Users/levi.kipke/Projects/cube-roku/tests/components/login/LoginPage.test.brs
+# FILE_START /Users/levi.kipke/Projects/cube-roku/tests/components/login/LoginPage.test.brs
+# Subtest: LoginPage
+    1..1
+    # Subtest: initialization
+        1..1
+        not ok 1 - initializes without error
+            ---
+            error:
+                message: what, bleh is blah?!
+                expected: "blah"
+                actual: "bleh"
+                funcName: m.assertEqual
+                numPassingAsserts: 3
+            stack:
+                - /Users/levi.kipke/Projects/cube-roku/tests/components/login/LoginPage.test.brs:9:22
+                - /Users/levi.kipke/Projects/cube-roku/tests/components/login/LoginPage.test.brs:5:22
+            ...
+    not ok 1 - initialization
+ok 1 - LoginPage
+1..4
+
+# FILE_END /Users/levi.kipke/Projects/cube-roku/tests/components/login/LoginPage.test.brs

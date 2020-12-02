@@ -4,7 +4,6 @@
 ' Adapted in part from https://github.com/mochajs/mocha/blob/5f8df0848aa52bb0f7a0844bcd3715012a6ecfd6/lib/reporters/tap.js
 function Tap() as object
     return {
-        setFilePath: __tap_setFilePath,
         version: __tap_version,
         plan: __tap_plan,
         pass: __tap_pass,
@@ -27,11 +26,6 @@ function Tap() as object
         }
     }
 end function
-
-' Prints a spec-appropriate TAP version string
-sub __tap_setFilePath(filePath as string)
-    m.__state.filePath = filePath
-end sub
 
 ' Prints a spec-appropriate TAP version string
 sub __tap_version()

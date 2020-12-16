@@ -11,9 +11,7 @@ function Tap() as object
         fail: __tap_fail,
         diagnostic: __tap_diagnostic,
         formatTitle: __tap_formatTitle,
-        printExtras: __tap_printExtras
-        startRun: __tap_startRun,
-        endRun: __tap_endRun,
+        printExtras: __tap_printExtras,
         enterSubTest: __tap_enterSubTest,
         exitSubTest: __tap_exitSubTest,
         indent: __tap_indent,

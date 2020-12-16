@@ -6,19 +6,24 @@ const { DefaultReporter, VerboseReporter, SummaryReporter } = require('@jest/rep
 const {
     addResult,
     createEmptyTestResult,
-    makeEmptyAggregatedTestResult,
-    formatTestResults
+    makeEmptyAggregatedTestResult
 } = require('@jest/test-result');
 const { readConfig } = require('jest-config');
 const { printDiffOrStringify } = require('jest-matcher-utils');
 const { formatResultsErrors } = require('jest-message-util');
 
-async function createReporter(type) {
-    let { projectConfig, globalConfig } = await readConfig(
-        {},
-        process.cwd()
-    );
-    let reporters = [new DefaultReporter(globalConfig), new SummaryReporter(globalConfig)];
+module.exports.createReporter = async function(type) {
+    console.log("HERE")
+    // Generate the necessary configs for Jest
+    let { projectConfig, globalConfig } = await readConfig({}, process.cwd());
+
+    let reporters = [new SummaryReporter(globalConfig)];
+    if (type === "jest-verbose") {
+        reporters.push(new VerboseReporter(globalConfig))
+    } else {
+        reporters.push(new DefaultReporter(globalConfig))
+    }
+
     return new Reporter(projectConfig, globalConfig, new Parser(), reporters, true);
 }
 
@@ -41,7 +46,10 @@ class Reporter {
             project: projectConfig,
             global: globalConfig,
         };
+
         this.aggregatedResults = makeEmptyAggregatedTestResult();
+        this.aggregatedResults.startTime = Date.now();
+
         this.reporters = reporters;
         this.reporters.forEach((reporter) => {
             reporter.onRunStart(
@@ -58,13 +66,54 @@ class Reporter {
     }
 
     subscribeParser(parser) {
-        parser.on('comment', function (comment) {
-            let [maybeDirective, maybeFileName] = comment.slice(2).trim().split(' ');
-            if (maybeDirective === 'FILE_START') {
+        parser.on('comment', this.onComment.bind(this));
+        parser.on('fail', this.onTestFailure.bind(this));
+        parser.on('complete', this.onParseComplete.bind(this, parser));
+
+        parser.on('child', function (childParser) {
+            this.subscribeParser(childParser);
+        }.bind(this));
+
+        parser.on('pass', function (assert) {
+            console.log(this)
+            this.currentResults.numPassingTests++;
+            this.addNonFailureTestResult(assert, "pass").bind(this);
+        }.bind(this));
+
+        parser.on('skip', function (assert) {
+            this.currentResults.numTodoTests++;
+            this.addNonFailureTestResult(assert, "skipped");
+        }.bind(this));
+
+        parser.on('todo', function (assert) {
+            this.currentResults.numTodoTests++;
+            this.addNonFailureTestResult(assert, "todo");
+        }.bind(this));
+
+        /*
+         * In the future, we could subscribe to any of these if we need the information.
+         */
+        // parser.on('extra', function (extra) { });
+        // parser.on('plan', function (plan) { });
+        // parser.on('bailout', function (reason) { });
+        // parser.on('result', function (result) { });
+        // parser.on('line', function (line) { });
+        // parser.on('assert', function (failure) { });
+    }
+
+    onComment(comment) {
+        // Grab the filename, if it exists, from the comment string.
+        let [maybeDirective, maybeFileName] = comment.slice(2).trim().split(' ');
+
+        switch (maybeDirective) {
+            case "FILE_START":
                 this.currentResults = createEmptyTestResult();
                 this.currentResults.testFilePath = maybeFileName;
-            } else if (maybeDirective === "FILE_END") {
+                break;
+
+            case "FILE_END":
                 addResult(this.aggregatedResults, this.currentResults);
+
                 this.currentResults.failureMessage = formatResultsErrors(
                     this.currentResults.testResults,
                     this.jestConfigs.project,
@@ -82,73 +131,71 @@ class Reporter {
                         this.aggregatedResults
                     );
                 });
-            }
-        }.bind(this));
+                break;
+            default:
+        }
+    }
 
-        parser.on('child', function (childParser) {
-            this.subscribeParser(childParser);
-        }.bind(this));
+    addNonFailureTestResult(assert, status) {
+        let assertion = {
+            status,
+            title: assert.name,
+            fullName: assert.name,
+            ancestorTitles: [assert.fullname],
+            failureMessages: [],
+        };
 
-        parser.on('pass', function (assert) {
-            console.log('Pass', assert);
-        }.bind(this));
+        this.currentResults.numPassingTests++;
+        this.currentResults.testResults.push(assertion);
+    }
 
-        parser.on('fail', function (assert) {
-            let { stack, error, numPassingAsserts } = assert.diag;
-            let diff = printDiffOrStringify(error.expected, error.actual, "Expected", "Received");
+    onTestFailure(assert) {
+        let { stack, error } = assert.diag;
+        let diff = printDiffOrStringify(error.expected, error.actual, "Expected", "Received");
 
-            // jest expects a specific format for the error message
-            let failureMessage = chalk.red(error.message)
-                + "\n\n"
-                + diff
-                + "\n at "
-                + error.funcName
-                + " "
-                + stack.map(line => "(" + line + ")").join("\n");
+        // jest expects a specific format for the error message
+        let failureMessage = chalk.red(error.message)
+            + "\n\n"
+            + diff
+            + "\n"
+            + stack.map((line, index) => {
+                if (index === 0) {
+                    return "at " + error.funcName + " (" + line + ")";
+                } else {
+                    return "at " + line;
+                }
+            }).join("\n");
 
-            let assertionError =
-            {
-                numPassingAsserts,
-                ancestorTitles: [assert.fullname],
-                failureDetails: [],
-                failureMessages: [failureMessage],
-                fullName: assert.name,
-                status: "failed",
-                title: assert.name,
-            };
+        let assertion = {
+            status: "failed",
+            title: assert.name,
+            fullName: assert.name,
+            ancestorTitles: [assert.fullname],
+            failureMessages: [failureMessage],
+        };
 
-            this.currentResults.numFailingTests++;
-            this.currentResults.testResults.push(assertionError);
-        }.bind(this));
+        this.currentResults.numFailingTests++;
+        this.currentResults.testResults.push(assertion);
+    }
 
-        parser.on('extra', function (extra) {
-            console.log('Extra', extra);
-        }.bind(this));
-
-        parser.on('complete', function (results) {
-            console.log("COMPLETE")
-            // If the root parser is complete, then we're done.
-            if (parser == this.rootParser) {
-                // console.log(this.aggregatedResults);
-                this.reporters.forEach((reporter) => reporter.onRunComplete(
+    onParseComplete(parser, results) {
+        // If the root parser is complete, then we're done.
+        if (parser == this.rootParser) {
+            this.reporters.forEach((reporter) => {
+                reporter.onRunComplete(
                     new Set([{ config: this.jestConfigs.project }]),
-                    this.aggregatedResults
-                ));
-                console.log(formatTestResults(this.aggregatedResults));
-            }
-        }.bind(this));
-        parser.on('plan', function (plan) { });
-        parser.on('bailout', function (reason) { });
-        parser.on('result', function (result) { });
-        parser.on('skip', function (assert) { });
-        parser.on('todo', function (assert) { });
-        parser.on('line', function (line) { });
-        parser.on('assert', function (failure) { });
+                    {
+                        ...this.aggregatedResults,
+                        numTotalTestSuites: 25
+                    }
+                );
+            });
+        }
     }
 }
 
-let readStrm = fs.createReadStream(path.join(process.cwd(), 'src', 'tap.tap'));
+// let readStrm = fs.createReadStream(path.join(process.cwd(), 'src', 'tap.tap'));
 
-createReporter("default").then(reporter => {
-    readStrm.pipe(reporter.rootParser);
-});
+// createReporter("default").then(reporter => {
+//     readStrm.pipe(reporter.rootParser);
+// });

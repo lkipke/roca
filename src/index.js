@@ -5,7 +5,7 @@ const util = require("util");
 const TapMochaReporter = require("tap-mocha-reporter");
 const c = require("ansi-colors");
 const coverage = require("./coverage");
-const Reporter = require("./reporter");
+const { createReporter } = require("./reporter");
 const { Stream } = require("stream");
 
 async function findBrsFiles(sourceDir) {
@@ -24,10 +24,12 @@ async function runTest(files, options) {
         "roca_main.brs",
         "assert_lib.brs"
     ].map(basename => path.join(__dirname, "..", "resources", basename));
+    console.log("REPORTER", reporter)
 
     let reporterStream;
-    if (reporter === "default") {
-        reporterStream = Reporter.createReporterStream()
+    if (reporter === "jest-default" || "jest-verbose") {
+        let r = await createReporter(reporter);
+        reporterStream = r.rootParser;
     } else if (reporter === "tap") {
         reporterStream = new Stream.Transform().pipe(process.stdout);
     } else {
@@ -75,8 +77,6 @@ async function runTest(files, options) {
         console.error("Interpreter found an error: ", e);
         process.exitCode = 1;
     }
-
-    return// reporterStream.runner.testResults;
 }
 
 module.exports = async function(args) {

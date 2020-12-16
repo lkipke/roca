@@ -56,13 +56,13 @@ function main() as object
         ' Don't allow test files to pollute each other
         _brs_.resetMocks()
 
-        tap.diagnostic("FILE_START: " filePathWithoutPkg)
+        tap.diagnostic("FILE_START: " + filePathWithoutPkg)
         suite = _brs_.runInScope(filePath, args)
-        tap.diagnostic("FILE_END: " filePathWithoutPkg)
+        tap.diagnostic("FILE_END: " + filePathWithoutPkg)
 
         ' If brs returned invalid for runInScope, that means the suite threw an exception, so we should bail.
         if suite = invalid then
-            tap.bail("Error running tests: Runtime exception occurred in " + filePathWithoutPkg))
+            tap.bail("Error running tests: Runtime exception occurred in " + filePathWithoutPkg)
             return {}
         end if
 

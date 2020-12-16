@@ -79,7 +79,9 @@ sub __isInvalid(actual, error)
 end sub
 
 function __formatError(error)
-    error.stack = _brs_.getStackTrace(2, "@hulu/roca")
+    fileFilters = ["@hulu/roca"]
+    numStackFrames = 2
+    error.stack = _brs_.getStackTrace(numStackFrames, fileFilters)
     return error
 end function
 

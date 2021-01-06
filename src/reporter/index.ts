@@ -1,2 +1,2 @@
 export * from "./utils";
-export * from "./Reporter";
+export * from "./JestReporter";

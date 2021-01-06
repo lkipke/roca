@@ -25,8 +25,9 @@ import {
 import { readConfig } from "jest-config";
 import type { Config } from "@jest/types";
 
-export type JestReporter = "jest-default" | "jest-verbose";
-export async function createReporter(type: JestReporter): Promise<Reporter> {
+export async function createReporter(
+    type: JestReporterType
+): Promise<Reporter> {
     // Let Jest generate the global and project that it'll use for reporting.
     let { projectConfig, globalConfig } = await readConfig(
         {} as Config.Argv,

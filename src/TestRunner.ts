@@ -19,11 +19,14 @@ export type MochaReporter =
     | "spec"
     | "tap"
     | "xunit";
+export type JestReporter = "jest-default" | "jest-verbose";
+export type Reporter = JestReporter | MochaReporter;
 
 export class TestRunner {
     readonly reporterStream: NodeJS.WriteStream & any;
+    protected tap: BrsTypes.BrsType;
 
-    constructor(reporterType: MochaReporter) {
+    constructor(reporterType: Reporter) {
         this.reporterStream = new TapMochaReporter(reporterType);
     }
 

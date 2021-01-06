@@ -92,7 +92,6 @@ sub __tap_printExtras(extra = {}, level = 0)
         print m.getIndent() "---"
     end if
 
-    print "EXTRA " extra
     m.indent()
     for each item in extra
         if type(extra[item]) = "roAssociativeArray" then

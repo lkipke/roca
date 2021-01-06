@@ -1,34 +1,9 @@
 import * as path from "path";
-import TapMochaReporter = require("tap-mocha-reporter");
 import { types as BrsTypes, ExecuteWithScope } from "brs";
-
-export type MochaReporter =
-    | "classic"
-    | "doc"
-    | "dot"
-    | "dump"
-    | "json"
-    | "jsonstream"
-    | "landing"
-    | "list"
-    | "markdown"
-    | "min"
-    | "nyan"
-    | "progress"
-    | "silent"
-    | "spec"
-    | "tap"
-    | "xunit";
-export type JestReporter = "jest-default" | "jest-verbose";
-export type Reporter = JestReporter | MochaReporter;
+import { BrsError } from "brs/types/Error";
 
 export class TestRunner {
-    readonly reporterStream: NodeJS.WriteStream & any;
-    protected tap: BrsTypes.BrsType;
-
-    constructor(reporterType: Reporter) {
-        this.reporterStream = new TapMochaReporter(reporterType);
-    }
+    constructor(readonly reporterStream: NodeJS.WriteStream & any) {}
 
     /**
      * Executes and reports a given list of test files.
@@ -43,7 +18,7 @@ export class TestRunner {
     ) {
         // Create an instance of the BrightScript TAP object so we can pass it to the tests for reporting.
         let tap = execute(
-            [path.join(__dirname, "..", "resources", "tap.brs")],
+            [path.join(__dirname, "..", "..", "resources", "tap.brs")],
             [new BrsTypes.Int32(testFiles.length)]
         );
 

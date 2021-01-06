@@ -3,24 +3,19 @@ import { glob } from "glob";
 import * as path from "path";
 import * as util from "util";
 import * as c from "ansi-colors";
-import * as Stream from "stream";
 import { ReportOptions } from "istanbul-reports";
 import { reportCoverage } from "./coverage";
-import { TestRunner, MochaReporter } from "./TestRunner";
-import { createReporter, JestReporter } from "./reporter";
+import { createTestRunner } from "./runner";
+import { MochaReporterType } from "./reporter";
 
 const { isBrsBoolean, isBrsString, RoArray, RoAssociativeArray } = types;
 const globPromise = util.promisify(glob);
 
 interface Options {
-    reporter: MochaReporter;
+    reporter: MochaReporterType;
     requireFilePath: string | undefined;
     forbidFocused: boolean;
     coverageReporters?: (keyof ReportOptions)[];
-}
-
-function isJestReporter(reporterName: Reporter): reporterName is JestReporter {
-    return reporterName === "jest-default" || reporterName === "jest-verbose";
 }
 
 async function findBrsFiles(sourceDir: string | undefined) {
@@ -54,7 +49,7 @@ async function run(files: string[], options: Options) {
     }
     inScopeFiles.push(...files);
 
-    let testRunner = new TestRunner(reporter);
+    let testRunner = await createTestRunner(reporter);
 
     // Create an execution scope using the project source files and roca files.
     let execute: ExecuteWithScope;

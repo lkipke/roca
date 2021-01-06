@@ -3,9 +3,11 @@ import { glob } from "glob";
 import * as path from "path";
 import * as util from "util";
 import * as c from "ansi-colors";
+import * as Stream from "stream";
 import { ReportOptions } from "istanbul-reports";
 import { reportCoverage } from "./coverage";
 import { TestRunner, MochaReporter } from "./TestRunner";
+import { createReporter, JestReporter } from "./reporter";
 
 const { isBrsBoolean, isBrsString, RoArray, RoAssociativeArray } = types;
 const globPromise = util.promisify(glob);
@@ -15,6 +17,10 @@ interface Options {
     requireFilePath: string | undefined;
     forbidFocused: boolean;
     coverageReporters?: (keyof ReportOptions)[];
+}
+
+function isJestReporter(reporterName: Reporter): reporterName is JestReporter {
+    return reporterName === "jest-default" || reporterName === "jest-verbose";
 }
 
 async function findBrsFiles(sourceDir: string | undefined) {

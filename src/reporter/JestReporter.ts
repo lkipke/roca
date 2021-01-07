@@ -20,6 +20,7 @@ import {
     createAssertionResult,
     createContext,
     createFailureMessage,
+    Diag,
 } from "./utils";
 import type { Config } from "@jest/types";
 
@@ -28,6 +29,8 @@ export class JestReporter {
     private aggregatedResults: AggregatedResult;
     /** The results from the test file that is currently being run. */
     private currentResults: TestResult = createEmptyTestResult();
+    /** The hierarchy of suite names for the current test. */
+    private suiteNames: string[] = [];
     /** List of Jest reporters to use. */
     private reporters: BaseReporter[];
 
@@ -41,23 +44,15 @@ export class JestReporter {
 
         // Create aggregated results for reporting
         this.aggregatedResults = makeEmptyAggregatedTestResult();
-        this.aggregatedResults.startTime = Date.now();
 
         // Create a summary reporter and either a default or verbose reporter.
-        this.reporters = [new SummaryReporter(globalConfig)];
+        this.reporters = [];
         if (reporterType === "jest-verbose") {
             this.reporters.push(new VerboseReporter(globalConfig));
         } else {
             this.reporters.push(new DefaultReporter(globalConfig));
         }
-
-        // Tell the reporters we're starting our test run.
-        this.reporters.forEach((reporter) => {
-            reporter.onRunStart(this.aggregatedResults, {
-                estimatedTime: 0,
-                showStatus: true,
-            });
-        });
+        this.reporters.push(new SummaryReporter(globalConfig));
     }
 
     /**
@@ -66,8 +61,22 @@ export class JestReporter {
      */
     protected subscribeToParser(parser: Parser) {
         parser.on("fail", this.onTestFailure.bind(this));
-        parser.on("complete", this.onParseComplete.bind(this, parser));
         parser.on("child", this.subscribeToParser.bind(this));
+
+        parser.on("comment", (comment) => {
+            let [
+                maybeSubtestString,
+                maybeSubtestName,
+            ] = (comment as string).trim().slice(2).split(":");
+            if (maybeSubtestString === "Subtest") {
+                this.suiteNames.push(maybeSubtestName.trim());
+            }
+        });
+
+        parser.on("complete", (results) => {
+            // Pop the name of this subtest off our list of suite names
+            this.suiteNames.pop();
+        });
 
         parser.on("pass", (assert: Assert) => {
             this.currentResults.numPassingTests++;
@@ -94,36 +103,55 @@ export class JestReporter {
                 type: "info",
             });
         });
+    }
 
-        /*
-         * In the future, we could subscribe to any of these if we need the information.
-         */
-        // parser.on("comment", this.onComment.bind(this));
-        // parser.on('plan', function (plan) { });
-        // parser.on('bailout', function (reason) { });
-        // parser.on('result', function (result) { });
-        // parser.on('line', function (line) { });
-        // parser.on('assert', function (failure) { });
+    /**
+     * Callback for when a test run is starting.
+     * @param numSuites The number of suites in the run
+     */
+    public onRunStart(numSuites: number) {
+        this.aggregatedResults.startTime = Date.now();
+        this.aggregatedResults.numTotalTestSuites = numSuites;
+
+        // Tell the reporters we're starting our test run.
+        this.reporters.forEach((reporter) => {
+            reporter.onRunStart(this.aggregatedResults, {
+                estimatedTime: 0,
+                showStatus: false,
+            });
+        });
+    }
+
+    /**
+     * Callback for when all test files have been executed.
+     */
+    public onRunComplete() {
+        let contextSet = new Set([createContext(this.projectConfig)]);
+        this.reporters.forEach((reporter) => {
+            reporter.onRunComplete(contextSet, this.aggregatedResults);
+        });
     }
 
     /**
      * Callback for when brs encounters an execution error.
+     * @param filename The name of the file that failed
+     * @param index The TAP index of the file
      * @param reason The error that was thrown to cause the execution error
      */
-    public onFileExecError(reason: any) {
+    public onFileExecError(filename: string, index: number, reason: any) {
         // If we get an array of errors, report the first one.
         reason = Array.isArray(reason) ? reason[0] : reason;
 
         // If it's a BrsError, use those fields.
         if (reason.location && reason.message) {
             this.currentResults.testExecError = {
-                stack: `at null:0:0\nat ${reason.location.file}:${reason.location.start.line}:${reason.location.start.column}`,
-                message: `${reason.message}`,
+                stack: `\nat ${reason.location.file}:${reason.location.start.line}:${reason.location.start.column}`,
+                message: reason.message,
             };
         } else {
             this.currentResults.testExecError = {
-                stack: null,
-                message: `${reason}`,
+                stack: `\nat ${reason.location.file}:${reason.location.start.line}:${reason.location.start.column}`,
+                message: reason.message,
             };
         }
     }
@@ -134,15 +162,17 @@ export class JestReporter {
      * @param filePath The path to the file that is starting its run.
      */
     public onFileStart(filePath: string) {
+        this.suiteNames = [];
         this.currentResults = createEmptyTestResult();
         this.currentResults.testFilePath = path.join(process.cwd(), filePath);
+        this.currentResults.perfStats.start = Date.now();
     }
 
     /**
      * Callback for when a file ends execution. Adds the results from the current
      * file to the aggregated results, and tells each Jest reporter that this file has completed.
      */
-    public onFileEnd() {
+    public onFileComplete() {
         // Flatten console output because tap-parser splits output by newline,
         // so we don't know which lines are supposed to go together.
         if (this.currentResults.console) {
@@ -152,7 +182,7 @@ export class JestReporter {
                         .map((entry) => entry.message)
                         .join(""),
                     origin: "",
-                    type: "info",
+                    type: "log",
                 },
             ];
         }
@@ -175,6 +205,11 @@ export class JestReporter {
                 this.currentResults.testFilePath
             );
         }
+
+        this.currentResults.perfStats.end = Date.now();
+        this.currentResults.perfStats.runtime =
+            this.currentResults.perfStats.start -
+            this.currentResults.perfStats.end;
 
         // Add our file results to the overall aggregated results
         addResult(this.aggregatedResults, this.currentResults);
@@ -200,7 +235,7 @@ export class JestReporter {
     protected addNonFailureTestResult(assert: Assert, status: Status) {
         this.currentResults.numPassingTests++;
         this.currentResults.testResults.push(
-            createAssertionResult(status, assert.name, assert.fullname)
+            createAssertionResult(status, assert.name, this.suiteNames)
         );
     }
 
@@ -208,7 +243,7 @@ export class JestReporter {
      * Callback when a test case fails.
      * @param assert Metadata object about the failed test.
      */
-    protected onTestFailure(assert: Assert) {
+    public onTestFailure(assert: Assert) {
         let failureMessage = assert.diag
             ? createFailureMessage(assert.diag)
             : "Test case failed";
@@ -219,31 +254,9 @@ export class JestReporter {
             createAssertionResult(
                 "failed",
                 assert.name,
-                assert.fullname,
+                this.suiteNames,
                 failureMessage
             )
         );
     }
-
-    /**
-     * Callback for when a Parser finishes parsing its segment of TAP output.
-     * @param parser The Parser instance that completed.
-     */
-    protected onParseComplete(parser: Parser, results: any) {
-        // If the root parser is complete, then tell the reporters that we're done.
-        if (parser === this.reporterStream) {
-            this.reporters.forEach((reporter) => {
-                reporter.onRunComplete(
-                    new Set([createContext(this.projectConfig)]),
-                    this.aggregatedResults
-                );
-            });
-        }
-    }
 }
-
-// let readStrm = fs.createReadStream(path.join(process.cwd(), 'src', 'tap.tap'));
-
-// createReporter("jest-verbose").then(reporter => {
-//     readStrm.pipe(reporter.reporterStream);
-// });

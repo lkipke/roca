@@ -7,10 +7,10 @@ import type { ProjectConfig } from "@jest/types/build/Config";
 export interface Diag {
     [key: string]: unknown;
     stack: string[];
-    expected: string;
-    actual: string;
     message: string;
-    funcname: string;
+    expected?: string;
+    actual?: string;
+    funcname?: string;
 }
 
 export interface Assert {
@@ -43,14 +43,14 @@ export function createContext(config: ProjectConfig): Context {
 export function createAssertionResult(
     status: Status,
     name: string,
-    ancestorName: string,
+    ancestorTitles: string[],
     failureMessage?: string
 ): AssertionResult {
     return {
         status,
+        ancestorTitles,
         title: name,
         fullName: name,
-        ancestorTitles: [ancestorName],
         failureMessages: failureMessage ? [failureMessage] : [],
         failureDetails: [],
         numPassingAsserts: 0,
@@ -64,13 +64,16 @@ export function createAssertionResult(
  */
 export function createFailureMessage(diag: Diag) {
     let { stack, expected, actual, message, funcname } = diag;
-    let diff = printDiffOrStringify(
-        expected,
-        actual,
-        "Expected",
-        "Received",
-        /* expand */ false
-    );
+    let diff: string | null = null;
+    if (expected && actual) {
+        diff = printDiffOrStringify(
+            expected,
+            actual,
+            "Expected",
+            "Received",
+            /* expand */ false
+        );
+    }
 
     let formattedStackTrace = stack
         .map((line, index) => {
@@ -82,5 +85,10 @@ export function createFailureMessage(diag: Diag) {
         })
         .join("\n");
 
-    return chalk.red(message) + "\n\n" + diff + "\n" + formattedStackTrace;
+    let fullMessage = chalk.red(message) + "\n\n";
+    if (diff) {
+        fullMessage += diff + "\n";
+    }
+    fullMessage += formattedStackTrace;
+    return fullMessage;
 }

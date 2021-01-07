@@ -22,23 +22,27 @@ export class JestRunner extends TestRunner {
         );
     }
 
-    /**
-     * Executes and reports a given test file.
-     * @override
-     */
-    protected executeFile(
+    /** @override */
+    protected _run(
         execute: ExecuteWithScope,
         executeArgs: BrsTypes.RoAssociativeArray,
-        filename: string
+        testFiles: string[]
     ) {
-        this.reporter.onFileStart(filename);
+        this.reporter.onRunStart(testFiles.length);
 
-        try {
-            execute([filename], [executeArgs]);
-        } catch (reason) {
-            this.reporter.onFileExecError(reason);
-        }
+        testFiles.forEach((filename, index) => {
+            this.reporter.onFileStart(filename);
+            try {
+                execute([filename], [executeArgs]);
+            } catch (reason) {
+                this.reporter.onFileExecError(filename, index, reason);
+            }
+            this.reporter.onFileComplete();
 
-        this.reporter.onFileEnd();
+            // Update the index so that our TAP reporting is correct.
+            executeArgs.elements.set("index", new BrsTypes.Int32(index + 1));
+        });
+
+        this.reporter.onRunComplete();
     }
 }

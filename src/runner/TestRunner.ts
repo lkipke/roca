@@ -1,6 +1,5 @@
 import * as path from "path";
 import { types as BrsTypes, ExecuteWithScope } from "brs";
-import { BrsError } from "brs/types/Error";
 
 export class TestRunner {
     constructor(readonly reporterStream: NodeJS.WriteStream & any) {}
@@ -21,34 +20,27 @@ export class TestRunner {
             [path.join(__dirname, "..", "..", "resources", "tap.brs")],
             [new BrsTypes.Int32(testFiles.length)]
         );
-
         let executeArgs = this.generateExecuteArgs(tap, focusedCasesDetected);
+        this._run(execute, executeArgs, testFiles);
+    }
+
+    protected _run(
+        execute: ExecuteWithScope,
+        executeArgs: BrsTypes.RoAssociativeArray,
+        testFiles: string[]
+    ) {
         testFiles.forEach((filename, index) => {
-            this.executeFile(execute, executeArgs, filename);
+            try {
+                execute([filename], [executeArgs]);
+            } catch (e) {
+                console.error(
+                    `Stopping execution. Interpreter encountered an error in ${filename}.`
+                );
+                process.exit(1);
+            }
             // Update the index so that our TAP reporting is correct.
             executeArgs.elements.set("index", new BrsTypes.Int32(index + 1));
         });
-    }
-
-    /**
-     * Executes and reports a given test file.
-     * @param execute The scoped execution function
-     * @param executeArgs Args to pass to the execution function
-     * @param filename The file to execute
-     */
-    protected executeFile(
-        execute: ExecuteWithScope,
-        executeArgs: BrsTypes.RoAssociativeArray,
-        filename: string
-    ) {
-        try {
-            execute([filename], [executeArgs]);
-        } catch (e) {
-            console.error(
-                `Stopping execution. Interpreter encountered an error in ${filename}.`
-            );
-            process.exit(1);
-        }
     }
 
     /**

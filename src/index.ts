@@ -1,34 +1,18 @@
-import * as brs from "brs";
+import { types, ExecuteWithScope, createExecuteWithScope } from "brs";
 import { glob } from "glob";
 import * as path from "path";
 import * as util from "util";
 import * as c from "ansi-colors";
 import { ReportOptions } from "istanbul-reports";
-import TapMochaReporter = require("tap-mocha-reporter");
 import { reportCoverage } from "./coverage";
+import { createTestRunner } from "./runner";
+import { MochaReporterType } from "./reporter";
 
+const { isBrsBoolean, isBrsString, RoArray, RoAssociativeArray } = types;
 const globPromise = util.promisify(glob);
 
-type MochaReporter =
-    | "classic"
-    | "doc"
-    | "dot"
-    | "dump"
-    | "json"
-    | "jsonstream"
-    | "landing"
-    | "list"
-    | "markdown"
-    | "min"
-    | "nyan"
-    | "progress"
-    | "silent"
-    | "spec"
-    | "tap"
-    | "xunit";
-
 interface Options {
-    reporter: MochaReporter;
+    reporter: MochaReporterType;
     requireFilePath: string | undefined;
     forbidFocused: boolean;
     coverageReporters?: (keyof ReportOptions)[];
@@ -40,6 +24,11 @@ async function findBrsFiles(sourceDir: string | undefined) {
     return globPromise(pattern);
 }
 
+/**
+ * Generates an execution scope and runs the tests.
+ * @param files List of filenames to load into the execution scope
+ * @param options BRS interpreter options
+ */
 async function run(files: string[], options: Options) {
     let {
         reporter,
@@ -49,42 +38,46 @@ async function run(files: string[], options: Options) {
     } = options;
     let coverageEnabled = coverageReporters.length > 0;
 
-    let rocaFiles = [
-        path.join("hasFocusedCases", "hasFocusedCases.brs"),
-        "roca_lib.brs",
-        "assert_lib.brs",
-    ].map((basename) => path.join(__dirname, "..", "resources", basename));
-
+    // Get the list of files that we should load into the execution scope.
+    // Loading them here ensures that they only get lexed/parsed once.
+    let rocaFiles = ["roca_lib.brs", "assert_lib.brs"].map((basename) =>
+        path.join(__dirname, "..", "resources", basename)
+    );
     let inScopeFiles = [...rocaFiles];
     if (requireFilePath) {
         inScopeFiles.push(requireFilePath);
     }
     inScopeFiles.push(...files);
 
-    let reporterStream = new TapMochaReporter(reporter);
-    let execute: brs.ExecuteWithScope;
+    let testRunner = await createTestRunner(reporter);
+
+    // Create an execution scope using the project source files and roca files.
+    let execute: ExecuteWithScope;
     try {
-        execute = await brs.createExecuteWithScope(inScopeFiles, {
+        execute = await createExecuteWithScope(inScopeFiles, {
             root: process.cwd(),
-            stdout: reporterStream,
+            stdout: testRunner.reporterStream,
             stderr: process.stderr,
             generateCoverage: coverageEnabled,
             componentDirs: ["test", "tests"],
         });
     } catch (e) {
-        console.error("Interpreter found an error: ", e);
+        console.error(
+            "Stopping execution. Interpreter encountered an error: ",
+            e
+        );
         process.exit(1);
     }
 
     let { testFiles, focusedCasesDetected } = await getTestFiles(execute);
-    await runTestFiles(execute, testFiles, focusedCasesDetected);
-
-    reporterStream.end();
+    testRunner.run(execute, testFiles, focusedCasesDetected);
+    testRunner.reporterStream.end();
 
     if (coverageEnabled) {
         reportCoverage(coverageReporters);
     }
 
+    // Fail if we find focused test cases and there weren't supposed to be any.
     if (forbidFocused && focusedCasesDetected) {
         let formattedList = testFiles
             .map((filename) => `\t${filename}`)
@@ -98,41 +91,16 @@ async function run(files: string[], options: Options) {
         );
     }
 
-    return reporterStream.runner?.testResults;
-}
-
-/**
- * Loops through the given test files and executes each one. If an interpreter exception is encountered,
- * then it exits with status code 1.
- * @param execute The function to execute each file with
- * @param testFiles The files to execute
- * @param focusedCasesDetected Whether or not focused cases were detected
- */
-async function runTestFiles(execute: brs.ExecuteWithScope, testFiles: string[], focusedCasesDetected: boolean) {
-    let tap = execute(
-        [path.join(__dirname, "..", "resources", "tap.brs")],
-        [new brs.types.Int32(testFiles.length)]
-    );
-    let runArgs = generateRunArgs(tap, focusedCasesDetected);
-    let indexString = new brs.types.BrsString("index");
-
-    testFiles.forEach((filename, index) => {
-        try {
-            execute([filename], [runArgs]);
-            runArgs.set(indexString, new brs.types.Int32(index));
-        } catch (e) {
-            console.error(`Interpreter found an error in ${filename}: `, e);
-            process.exit(1);
-        }
-    });
+    return testRunner.reporterStream.runner?.testResults;
 }
 
 /**
  * Returns the appropriate set of *.test.brs files, depending on whether it detects any focused tests.
+ * Runs through the entire test suite (in non-exec mode) to determine this.
  * Also returns a boolean indicating whether focused tests were found.
  * @param execute The scoped execution function to run with each file
  */
-async function getTestFiles(execute: brs.ExecuteWithScope) {
+async function getTestFiles(execute: ExecuteWithScope) {
     let testsPattern = path.join(
         process.cwd(),
         `{test,tests,source,components}`,
@@ -142,22 +110,16 @@ async function getTestFiles(execute: brs.ExecuteWithScope) {
     let testFiles: string[] = await globPromise(testsPattern);
 
     let focusedSuites: string[] = [];
-    let emptyRunArgs = new brs.types.RoAssociativeArray([]);
-    let scriptPath = path.join(
-        __dirname,
-        "..",
-        "resources",
-        "hasFocusedCases",
-        "main.brs"
-    );
+    let emptyRunArgs = new RoAssociativeArray([]);
     testFiles.forEach((filename) => {
         try {
+            // Run the file in non-exec mode.
             let suite = execute([filename], [emptyRunArgs]);
-            let hasFocusedCases = execute([scriptPath], [suite]);
-            if (
-                brs.types.isBrsBoolean(hasFocusedCases) &&
-                hasFocusedCases.toBoolean()
-            ) {
+
+            // Keep track of which files have focused cases.
+            let subSuites =
+                suite instanceof RoArray ? suite.getElements() : [suite];
+            if (hasFocusedCases(subSuites)) {
                 focusedSuites.push(filename);
             }
         } catch {
@@ -173,32 +135,34 @@ async function getTestFiles(execute: brs.ExecuteWithScope) {
 }
 
 /**
- * Generates the run arguments for roca, to pass to test files when executing them.
- * @param tap The return value from tap.brs (an instance of the Tap object)
- * @param focusedCasesDetected Whether or not there are focused cases in this run
+ * Checks to see if any suites in a given array of suites are focused.
+ * @param subSuites An array of Roca suite objects to check
  */
-function generateRunArgs(
-    tap: brs.types.BrsType,
-    focusedCasesDetected: boolean
-) {
-    return new brs.types.RoAssociativeArray([
-        {
-            name: new brs.types.BrsString("exec"),
-            value: brs.types.BrsBoolean.from(true),
-        },
-        {
-            name: new brs.types.BrsString("focusedCasesDetected"),
-            value: brs.types.BrsBoolean.from(focusedCasesDetected),
-        },
-        {
-            name: new brs.types.BrsString("index"),
-            value: new brs.types.Int32(0),
-        },
-        {
-            name: new brs.types.BrsString("tap"),
-            value: tap,
-        },
-    ]);
+function hasFocusedCases(subSuites: types.BrsType[]): boolean {
+    for (let subSuite of subSuites) {
+        if (!(subSuite instanceof RoAssociativeArray)) continue;
+
+        let mode = subSuite.elements.get("mode");
+        if (mode && isBrsString(mode) && mode.value === "focus") {
+            return true;
+        }
+
+        let state = subSuite.elements.get("__state");
+        if (state instanceof RoAssociativeArray) {
+            let hasFocusedDescendants = state.elements.get(
+                "hasfocuseddescendants"
+            );
+            if (
+                hasFocusedDescendants &&
+                isBrsBoolean(hasFocusedDescendants) &&
+                hasFocusedDescendants.toBoolean()
+            ) {
+                return true;
+            }
+        }
+    }
+
+    return false;
 }
 
 module.exports = async function (

@@ -10,7 +10,6 @@ import { MochaReporterType } from "./reporter";
 
 const { isBrsBoolean, isBrsString, RoArray, RoAssociativeArray } = types;
 const globPromise = util.promisify(glob);
-
 interface Options {
     reporter: MochaReporterType;
     requireFilePath: string | undefined;

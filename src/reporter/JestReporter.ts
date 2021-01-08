@@ -51,7 +51,8 @@ export class JestReporter {
      * Subscribe to a TAP Parser's events.
      * @param parser Parser instance to subscribe
      */
-    protected subscribeToParser(parser: Parser) {
+    protected subscribeToParser(newParser: Parser) {
+        let parser = newParser as NodeJS.WriteStream;
         parser.on("fail", (assert: Assert) => {});
         parser.on("child", (childParser: Parser) => {});
         parser.on("comment", (comment: string) => {});

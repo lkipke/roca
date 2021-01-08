@@ -1,9 +1,9 @@
 import { Config } from "@jest/types";
 import { readConfig } from "jest-config";
-import { ReporterType, JestReporterType } from "../reporter";
-import { JestRunner } from "./JestRunner";
 import Parser = require("tap-parser");
 import TapMochaReporter = require("tap-mocha-reporter");
+import { ReporterType, JestReporterType } from "../reporter";
+import { JestRunner } from "./JestRunner";
 import { TestRunner } from "./TestRunner";
 
 function isJestReporter(

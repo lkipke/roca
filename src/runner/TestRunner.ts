@@ -24,22 +24,29 @@ export class TestRunner {
         this._run(execute, executeArgs, testFiles);
     }
 
+    /**
+     * Executes and reports a given test file. Subclasses should override this method
+     * with custom implementations as needed.
+     * @param execute The scoped execution function
+     * @param executeArgs Args to pass to the execution function
+     * @param filename The file to execute
+     */
     protected _run(
         execute: ExecuteWithScope,
         executeArgs: BrsTypes.RoAssociativeArray,
         testFiles: string[]
     ) {
         testFiles.forEach((filename, index) => {
+            // Set the index so that our TAP reporting is correct.
+            executeArgs.elements.set("index", new BrsTypes.Int32(index));
             try {
                 execute([filename], [executeArgs]);
             } catch (e) {
                 console.error(
-                    `Stopping execution. Interpreter encountered an error in ${filename}.`
+                    `Stopping execution. Interpreter encountered an error in ${filename}:\n\t${e}`
                 );
                 process.exit(1);
             }
-            // Update the index so that our TAP reporting is correct.
-            executeArgs.elements.set("index", new BrsTypes.Int32(index + 1));
         });
     }
 

@@ -63,8 +63,7 @@ async function run(files: string[], options: Options) {
         });
     } catch (e) {
         console.error(
-            "Stopping execution. Interpreter encountered an error: ",
-            e
+            `Stopping execution. Interpreter encountered an error:\n\t${e}`
         );
         process.exit(1);
     }
